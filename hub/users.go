@@ -1,3 +1,6 @@
+// Copyright (c) 2015 The Radio Noise Project Members
+// See COPYING for the license terms and complete list of copyright holders
+
 package hub
 
 import "github.com/radionoiseproject/rnp-server/interfaces"
