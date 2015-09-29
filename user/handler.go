@@ -15,7 +15,7 @@ type handler struct {
 
 func misakaUpgradeError(w http.ResponseWriter, r *http.Request, status int, reason error) {
 	w.WriteHeader(status)
-	fmt.Fprintf(w, "“‘%s,’ MISAKA says, acting as if she understands what that means.”",
+	fmt.Fprintf(w, "“‘Error: %s,’ MISAKA says, acting as if she understands what that means.”",
 		reason)
 }
 
