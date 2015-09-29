@@ -13,18 +13,21 @@ type message interface {
 type hub struct {
 	users   map[string]interfaces.User
 	channel chan message
+	shutdown chan struct{}
 }
 
 func New() *hub {
 	return &hub{
 		users:   make(map[string]interfaces.User),
-		channel: make(chan message, 100),
+		channel: make(chan message),
+		shutdown: make(chan struct{}),
 	}
 }
 
+// interfaces.Hub
+
 func (h *hub) Run() {
-	for {
-		m := <-h.channel
+	for m := range h.channel {
 		switch m.(type) {
 		case *broadcastMessageType:
 			h.handleBroadcastMessage(m.(*broadcastMessageType))
@@ -34,6 +37,12 @@ func (h *hub) Run() {
 			fmt.Printf("Unexpected hub message: %s", m)
 		}
 	}
+	h.shutdown <- struct{}{}
+}
+
+func (h *hub) Done() {
+	close(h.channel)
+	<-h.shutdown
 }
 
 func (h *hub) Broadcast(msg interfaces.Message) {

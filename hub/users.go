@@ -25,7 +25,7 @@ func (h *hub) handleRegisterUserMessage(m *registerUserMessageType) {
 	if ok {
 		log.Printf("Attempting to register already-registered user: %s",
 			m.id)
-		user.ForceDisconnect()
+		user.Done()
 	}
 	h.users[m.id] = m.user
 }

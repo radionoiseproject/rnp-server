@@ -10,4 +10,5 @@ func main() {
 	h := hub.New()
 	go h.Run()
 	fmt.Println("Hello, World!")
+	h.Done()
 }
