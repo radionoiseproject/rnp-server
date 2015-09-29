@@ -6,11 +6,13 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/radionoiseproject/rnp-server/hub"
 	"github.com/radionoiseproject/rnp-server/user"
 	"log"
 	"net/http"
+	"os"
 )
 
 var (
@@ -30,11 +32,13 @@ func main() {
 	h := hub.New()
 	go h.Run()
 
-	var router = mux.NewRouter()
+	router := mux.NewRouter()
 	router.NotFoundHandler = misakaNotFoundHandler{}
 	router.Handle("/rnp", user.Handler(h))
 
-	http.Handle("/", router)
+	loggedRouter := handlers.CombinedLoggingHandler(os.Stderr, router)
+
+	http.Handle("/", loggedRouter)
 
 	log.Printf("Radio Noise Project listening on %s\n", *bind)
 
