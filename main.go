@@ -14,11 +14,14 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 )
 
 var (
-	bind = flag.String("bind", ":8080", "address and port to listen on")
+	bind     = flag.String("bind", ":8080", "address and port to listen on")
+	loglevel = flag.String("loglevel", "info", "level of log output (debug, info, warn, error, fatal, panic)")
 )
 
 type misakaNotFoundHandler struct{}
@@ -31,6 +34,13 @@ func (_ misakaNotFoundHandler) ServeHTTP(w http.ResponseWriter, req *http.Reques
 func main() {
 	flag.Parse()
 
+	// Logging setup
+	level, err := log.ParseLevel(*loglevel)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.SetLevel(level)
+
 	h := hub.New()
 	go h.Run()
 
@@ -38,9 +48,10 @@ func main() {
 	router.NotFoundHandler = misakaNotFoundHandler{}
 	router.Handle("/rnp", user.Handler(h))
 
-	loggedRouter := handlers.CombinedLoggingHandler(os.Stderr, router)
+	logHandler := handlers.CombinedLoggingHandler(os.Stderr, router)
+	proxyHeaderHandler := handlers.ProxyHeaders(logHandler)
 
-	http.Handle("/", loggedRouter)
+	http.Handle("/", proxyHeaderHandler)
 
 	var l net.Listener
 	var listenFields log.Fields
@@ -54,6 +65,18 @@ func main() {
 		if err != nil {
 			log.WithFields(listenFields).Fatal(err)
 		}
+		defer func() {
+			log.WithFields(listenFields).Debug("Cleaning up socket")
+			err = os.Remove(*bind)
+			if err != nil {
+				log.WithFields(listenFields).Fatalf(
+					"Failed to unlink socket: %s", err)
+			}
+		}()
+		err = os.Chmod(*bind, os.ModePerm)
+		if err != nil {
+			log.WithFields(listenFields).Fatalf("Could not set socket permissions: %s", err)
+		}
 	} else {
 		listenFields = log.Fields{"bind": *bind, "listener": "tcp"}
 		a, err := net.ResolveTCPAddr("tcp", *bind)
@@ -66,11 +89,18 @@ func main() {
 		}
 	}
 
+	go func() {
+		if err := http.Serve(l, nil); err != nil {
+			log.Fatal(err)
+		}
+	}()
 	log.WithFields(listenFields).Info("Radio Noise Project listening")
 
-	if err := http.Serve(l, nil); err != nil {
-		log.Fatal(err)
-	}
+	sigChan := make(chan os.Signal)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGQUIT)
+
+	sig := <-sigChan
+	log.WithFields(log.Fields{"signal": sig}).Info("Exiting due to signal")
 
 	h.Done()
 }
